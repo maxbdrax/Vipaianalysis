@@ -50,12 +50,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenAuth }) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-600 via-purple-600 to-indigo-600 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-pink-600/30">
-              {currentUser?.email ? currentUser.email[0].toUpperCase() : 'VIP'}
+              {(userProfile?.email || currentUser?.email || 'VIP')[0].toUpperCase()}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-base text-white">
-                  {currentUser ? (currentUser.displayName || currentUser.email) : 'Guest VIP Visitor'}
+                  {userProfile?.displayName || (currentUser ? (currentUser.displayName || currentUser.email) : 'Guest VIP Visitor')}
                 </h3>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                   role === 'ADMIN' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
@@ -66,13 +66,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenAuth }) => {
                 </span>
               </div>
               <div className="text-xs text-slate-400 font-mono mt-0.5">
-                {currentUser ? `Firebase UID: ${currentUser.uid.slice(0, 14)}...` : 'Sign in to access VIP features'}
+                {userProfile ? `Email: ${userProfile.email}` : currentUser ? `Firebase UID: ${currentUser.uid.slice(0, 14)}...` : 'Sign in to access VIP features'}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {currentUser ? (
+            {currentUser || userProfile ? (
               <button
                 type="button"
                 onClick={logout}
@@ -91,6 +91,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenAuth }) => {
               </button>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Firebase Domain Authorization Status & Helper */}
+      <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-950/20">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-mono uppercase text-amber-300 font-bold flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span>Firebase Authorized Domain Status (auth/unauthorized-domain Fix)</span>
+          </h4>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            GOOGLE SIGN-IN CONFIG
+          </span>
+        </div>
+        <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+          যদি Google Sign-In বাটনে চাপ দিলে <code className="text-amber-300 font-mono bg-black/40 px-1 py-0.5 rounded">auth/unauthorized-domain</code> এরর আসে, তাহলে নিচের কারেন্ট ডোমেনটি Firebase Console-এ যোগ করে নিন:
+        </p>
+        <div className="p-3 rounded-xl bg-black/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="font-mono text-xs text-cyan-300 truncate select-all">
+            {typeof window !== 'undefined' ? window.location.hostname : 'run.app'}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  navigator.clipboard.writeText(window.location.hostname);
+                  alert('Domain copied to clipboard!');
+                }
+              }}
+              className="py-1.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs cursor-pointer transition-colors"
+            >
+              📋 Copy Domain
+            </button>
+            <a
+              href="https://console.firebase.google.com/project/deft-granite-6f6jr/authentication/settings"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-mono text-xs cursor-pointer border border-slate-700"
+            >
+              Open Firebase Settings ↗
+            </a>
+          </div>
+        </div>
+        <div className="text-[11px] text-slate-400 font-sans space-y-1">
+          <p>• ধাপ ১: <strong>Open Firebase Settings</strong> এ ক্লিক করে "Authorized domains" সেকশনে যান।</p>
+          <p>• ধাপ ২: <strong>Add domain</strong> বাটনে ক্লিক করে কপি করা ডোমেইন পেস্ট করে সেভ করুন।</p>
         </div>
       </div>
 

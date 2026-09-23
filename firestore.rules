@@ -71,8 +71,8 @@ service cloud.firestore {
     }
 
     match /drawResults/{drawId} {
-      // Anyone signed in can read draw results (real-time shared)
-      allow read: if isSignedIn();
+      // Historical draw outcomes are public data
+      allow read: if true;
 
       // Only ADMIN and ANALYST can create results
       allow create: if isSignedIn() && isAnalyst() && isValidId(drawId) &&

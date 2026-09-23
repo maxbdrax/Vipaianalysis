@@ -9,7 +9,7 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenAuth, onOpenProfile }) => {
-  const { currentUser, role, isAdmin } = useAuth();
+  const { currentUser, userProfile, role, isAdmin } = useAuth();
   const { syncState, lastUpdated, totalCount } = useDrawData();
 
   const formattedTime = lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -110,17 +110,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenAuth, onOpenProfile 
 
         {/* User Status / Role / Auth Action */}
         <div className="flex items-center gap-2">
-          {currentUser ? (
+          {currentUser || userProfile ? (
             <button
               onClick={onOpenProfile}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 transition-all text-left text-xs"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 transition-all text-left text-xs cursor-pointer"
             >
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white text-[11px] font-bold">
-                {currentUser.email ? currentUser.email[0].toUpperCase() : 'U'}
+                {(userProfile?.email || currentUser?.email || 'U')[0].toUpperCase()}
               </div>
               <div className="hidden sm:block">
                 <div className="text-slate-200 font-medium truncate max-w-[120px]">
-                  {currentUser.displayName || currentUser.email?.split('@')[0]}
+                  {userProfile?.displayName || currentUser?.displayName || currentUser?.email?.split('@')[0]}
                 </div>
                 <div className="flex items-center gap-1">
                   {getRoleBadge()}

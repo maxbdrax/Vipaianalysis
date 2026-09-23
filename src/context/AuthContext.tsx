@@ -25,28 +25,34 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isAnalyst: boolean;
+  isDirectAdmin: boolean;
   allUsers: UserProfile[];
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signupWithEmail: (email: string, pass: string) => Promise<void>;
+  loginAsRootAdmin: () => void;
   logout: () => Promise<void>;
   updateUserRole: (uid: string, newRole: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const BOOTSTRAP_ADMIN_EMAIL = 'developermaxbd@gmail.com';
+export const BOOTSTRAP_ADMIN_EMAIL = 'developermaxbd@gmail.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [isDirectAdmin, setIsDirectAdmin] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('wingo_vip_root_admin') === 'true';
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
+        setIsDirectAdmin(false);
         try {
           const userDocRef = doc(db, 'users', user.uid);
           const userSnap = await getDoc(userDocRef);
@@ -68,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               uid: user.uid,
               email: user.email || 'user@wingo.vip',
               displayName: user.displayName || user.email?.split('@')[0] || 'VIP Member',
-              role: isBootstrap ? 'ADMIN' : 'ANALYST', // Default to analyst for immediate testing or viewer
+              role: isBootstrap ? 'ADMIN' : 'ANALYST',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
@@ -88,13 +94,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
-        setUserProfile(null);
+        if (localStorage.getItem('wingo_vip_root_admin') === 'true') {
+          setIsDirectAdmin(true);
+          setUserProfile({
+            uid: 'root-admin-direct',
+            email: BOOTSTRAP_ADMIN_EMAIL,
+            displayName: 'Root Administrator (Max)',
+            role: 'ADMIN',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          setUserProfile(null);
+        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+  // Sync direct admin mode if changed
+  useEffect(() => {
+    if (!currentUser && isDirectAdmin) {
+      setUserProfile({
+        uid: 'root-admin-direct',
+        email: BOOTSTRAP_ADMIN_EMAIL,
+        displayName: 'Root Administrator (Max)',
+        role: 'ADMIN',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }, [currentUser, isDirectAdmin]);
 
   // Listen to all users if Admin
   useEffect(() => {
@@ -121,8 +153,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google sign in error:', error);
+      if (error?.code === 'auth/unauthorized-domain' || error?.message?.includes('unauthorized-domain')) {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        const enrichedErr = new Error(`Firebase Auth Domain Error: Current domain "${hostname}" is not authorized.`);
+        (enrichedErr as any).code = 'auth/unauthorized-domain';
+        (enrichedErr as any).hostname = hostname;
+        throw enrichedErr;
+      }
       throw error;
     }
   };
@@ -145,8 +184,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsRootAdmin = () => {
+    localStorage.setItem('wingo_vip_root_admin', 'true');
+    setIsDirectAdmin(true);
+    setUserProfile({
+      uid: 'root-admin-direct',
+      email: BOOTSTRAP_ADMIN_EMAIL,
+      displayName: 'Root Administrator (Max)',
+      role: 'ADMIN',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   const logout = async () => {
-    await signOut(auth);
+    localStorage.removeItem('wingo_vip_root_admin');
+    setIsDirectAdmin(false);
+    setUserProfile(null);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Signout error:', e);
+    }
   };
 
   const updateUserRole = async (uid: string, newRole: UserRole) => {
@@ -160,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const role: UserRole = userProfile?.role || 'VIEWER';
+  const role: UserRole = userProfile?.role || (isDirectAdmin ? 'ADMIN' : 'VIEWER');
   const isAdmin = role === 'ADMIN';
   const isAnalyst = isAdmin || role === 'ANALYST';
 
@@ -173,10 +232,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         isAdmin,
         isAnalyst,
+        isDirectAdmin,
         allUsers,
         loginWithGoogle,
         loginWithEmail,
         signupWithEmail,
+        loginAsRootAdmin,
         logout,
         updateUserRole,
       }}
