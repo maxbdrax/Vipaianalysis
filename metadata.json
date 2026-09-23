@@ -1,0 +1,6 @@
+{
+  "name": "WIN GO AI VIP ANALYZER",
+  "description": "Premium historical lottery analytics, Markov transition matrices, 2-step and 3-step sequence pattern research, multi-model ensemble backtesting, and OCR digitizer for WinGo lottery numbers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

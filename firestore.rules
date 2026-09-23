@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn() && request.auth.token.email == 'developermaxbd@gmail.com';
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole() == 'ADMIN');
+    }
+
+    function isAnalyst() {
+      return isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole() == 'ANALYST');
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidId(userId) &&
+        request.resource.data.keys().hasAll(['uid', 'email', 'role']) &&
+        request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 256 &&
+        // Prevent normal users from self-assigning ADMIN unless bootstrap admin
+        (request.resource.data.role in ['ANALYST', 'VIEWER'] || (request.resource.data.role == 'ADMIN' && isBootstrapAdmin()));
+
+      allow update: if isSignedIn() && isValidId(userId) && (
+        // Admin updating someone's role
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt'])) ||
+        // User updating their own display name
+        (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+      );
+
+      allow delete: if isAdmin() && !isBootstrapAdmin();
+    }
+
+    // --- Draw Results Collection ---
+    function isValidDrawResult(data) {
+      return data.keys().hasAll(['drawId', 'result', 'bigSmall', 'color', 'oddEven', 'timestamp']) &&
+        data.keys().hasOnly(['drawId', 'result', 'bigSmall', 'color', 'oddEven', 'timestamp', 'dateStr', 'timeStr', 'source', 'notes', 'createdBy', 'createdAt', 'updatedAt']) &&
+        isValidId(data.drawId) &&
+        data.result is number && data.result >= 0 && data.result <= 9 &&
+        data.bigSmall in ['Big', 'Small'] &&
+        data.color in ['Red', 'Green', 'Purple', 'RedPurple', 'GreenPurple'] &&
+        data.oddEven in ['Odd', 'Even'] &&
+        data.timestamp is number &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+        (!('source' in data) || (data.source is string && data.source.size() <= 64)) &&
+        (!('dateStr' in data) || (data.dateStr is string && data.dateStr.size() <= 32)) &&
+        (!('timeStr' in data) || (data.timeStr is string && data.timeStr.size() <= 32));
+    }
+
+    match /drawResults/{drawId} {
+      // Anyone signed in can read draw results (real-time shared)
+      allow read: if isSignedIn();
+
+      // Only ADMIN and ANALYST can create results
+      allow create: if isSignedIn() && isAnalyst() && isValidId(drawId) &&
+        isValidDrawResult(request.resource.data) &&
+        request.resource.data.drawId == drawId &&
+        (!('createdBy' in request.resource.data) || request.resource.data.createdBy == request.auth.uid);
+
+      // Only ADMIN can edit draw results
+      allow update: if isSignedIn() && isAdmin() && isValidId(drawId) &&
+        isValidDrawResult(request.resource.data) &&
+        request.resource.data.drawId == resource.data.drawId;
+
+      // Only ADMIN can delete draw results
+      allow delete: if isSignedIn() && isAdmin() && isValidId(drawId);
+    }
+
+    // --- Application Settings ---
+    match /appSettings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin() && isValidId(settingId);
+    }
+
+    // --- Audit Logs ---
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isValidId(logId) &&
+        request.resource.data.keys().hasAll(['id', 'userId', 'action', 'timestamp']) &&
+        request.resource.data.keys().hasOnly(['id', 'userId', 'userEmail', 'action', 'recordId', 'oldValue', 'newValue', 'timestamp']) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.action in ['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'SETTINGS_UPDATE'];
+      allow update, delete: if false; // Audit logs are immutable
+    }
+  }
+}

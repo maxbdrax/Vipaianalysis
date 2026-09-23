@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role-based access control",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["ADMIN", "ANALYST", "VIEWER"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "DrawResult": {
+      "title": "DrawResult",
+      "description": "Historical lottery draw result record",
+      "type": "object",
+      "properties": {
+        "drawId": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "result": { "type": "number" },
+        "bigSmall": { "type": "string", "enum": ["Big", "Small"] },
+        "color": { "type": "string", "enum": ["Red", "Green", "Purple", "RedPurple", "GreenPurple"] },
+        "oddEven": { "type": "string", "enum": ["Odd", "Even"] },
+        "timestamp": { "type": "number" },
+        "dateStr": { "type": "string", "maxLength": 32 },
+        "timeStr": { "type": "string", "maxLength": 32 },
+        "source": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["drawId", "result", "bigSmall", "color", "oddEven", "timestamp"]
+    },
+    "AppSetting": {
+      "title": "AppSetting",
+      "description": "System and model configurations",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "maxLength": 64 },
+        "value": { "type": "string", "maxLength": 5000 },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["key", "value"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Audit record for all database mutations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 },
+        "action": { "type": "string", "enum": ["CREATE", "UPDATE", "DELETE", "IMPORT", "SETTINGS_UPDATE"] },
+        "recordId": { "type": "string", "maxLength": 128 },
+        "oldValue": { "type": "string", "maxLength": 5000 },
+        "newValue": { "type": "string", "maxLength": 5000 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profiles and role designations"
+    },
+    "/drawResults/{drawId}": {
+      "schema": "DrawResult",
+      "description": "Stores individual historical draw lottery results"
+    },
+    "/appSettings/{settingId}": {
+      "schema": "AppSetting",
+      "description": "System configuration and statistical model parameters"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Audit logs of administrative and analysis actions"
+    }
+  }
+}
